@@ -12,99 +12,99 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #include <string.h>
 
-void ft_putchar(int fd, char c)
+void ft_putchar(char c, int fd)
 {
     write(fd, &c, 1);
 }
 
-void ft_putstr(int fd, char *s)
+void ft_putstr(char *s, int fd)
 {
     if (!s)
-        ft_putstr(fd, "(null)");
+        write(fd, "(null)", 6);
     else
         while (*s)
-            ft_putchar(fd, *s++);
-    ft_putchar(fd, '\n');
+            ft_putchar(*s++, fd);
 }
 
-int ft_cd(char **str, int i)
+int ft_cd(char **s, int i)
 {
     if (i != 2)
-        ft_putstr(2, "cd: too many arguments");
-    else if (chdir(str[1]) == -1)
     {
-        ft_putstr(2, "cd: cannot change directory to ");
-        ft_putstr(2, str[2]);
+        ft_putstr("error: cd: bad arguments", 2);
     }
+    else if (chdir(s[1]) == -1)
+    {
+        ft_putstr("error: cd: cannot change directory to ", 2);
+        ft_putstr(s[1], 2);
+    }
+	ft_putchar('\n', 2);
+    return EXIT_FAILURE;
 }
 
-int execute_cmd(char **s, char **envv, int i, int tmp)
+int execut_cmd(char **s, char **envv, int tmp, int i)
 {
     s[i] = NULL;
     dup2(tmp, 0);
     close(tmp);
     execve(s[0], s, envv);
-    ft_putstr(2, "cannot Execute");
-    ft_putstr(2, s[0]);
-    return (EXIT_FAILURE);
+    ft_putstr("error: cannot execute ", 2);
+    ft_putstr(s[0], 2);
+    ft_putchar('\n', 2);
+    return EXIT_FAILURE;
 }
 
 int main(int ac, char **str, char **envv)
 {
-    int i, fd[2], tmp;
-    int exit_status;
+    int i, tmp, fd[2];
 
-    exit_status = 0;
-    if (ac > 1)
+	(void)ac;
+    i = 0;
+    tmp = dup(0);
+    while (str[i] && str[i + 1])
     {
-        tmp = dup(0);
-        while (str[i] && str[i + 1])
+        str = &str[i + 1];
+        i = 0;
+        while (str[i] && (strcmp(str[i], "|") && strcmp(str[i], ";")))
+            i++;
+        if (!strcmp(str[0], "cd"))
+            ft_cd(str, i);
+        else if (i && (!str[i] || !strcmp(";", str[i])))
         {
-            str = &str[i + 1];
-            i = 0;
-            while (str[i] && !strcmp(str[i], "|") && !strcmp(str[i], ","))
-                i++;
-            if (!strcmp(str[i], "cd"))
-                exit_status = ft_cd(str, i);
-            else if (i && (str[i] || !strcmp(str[i], ";")))
+            if (!fork())
             {
-                if (!fork())
-                {
-                    if (execute_cmd(str, envv, i, tmp))
-                        return (EXIT_FAILURE);
-                }
-                else
-                {
-                    close(tmp);
-                    while (waitpid(-1, NULL, 0) != -1)
-                        ;
-                }
-                tmp = dup(0); 
+                if (execut_cmd(str, envv, tmp, i))
+                    return (1);
             }
-            else if (i && !strcmp(str[i], "|"))            {
+            else
             {
-                pipe(fd);
-                if (!fork())
-                {
-                    dup2(fd[1], 1);
-                    close(fd[0]);
-                    close(fd[1]);
-                    if(execute_cmd(str, envv, i, tmp))
-                        return (EXIT_FAILURE);
-                }
-                else
-                {
-                    close(fd[1]);
-                    close(tmp);
-                    tmp = fd[0];
-                }
+                close(tmp);
+                while (waitpid(-1, NULL, 0) != -1)
+                    ;
+            }
+            tmp = dup(0);
+        }
+        else if (i && !strcmp(str[i], "|"))
+        {
+            pipe(fd);
+            if (!fork())
+            {
+                dup2(fd[1], 1);
+                close(fd[0]);
+                close(fd[1]);
+                if (execut_cmd(str, envv, tmp, i))
+                    return 1;
+            }
+            else
+            {
+                close(fd[1]);
+                close(tmp);
+                tmp = fd[0];
             }
         }
-        return (close(fd[0]), exit_status);
     }
-    return (exit_status);
+	return (close(tmp), 0);
 }
