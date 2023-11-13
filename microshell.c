@@ -33,13 +33,16 @@ void ft_putstr(char *s, int fd)
 void ft_cd(char **s, int i)
 {
     if (i != 2)
+    {
         ft_putstr("error: cd: bad arguments", 2);
+        ft_putchar('\n', 2);
+    }
     else if (chdir(s[1]) != 0)
     {
         ft_putstr("error: cd: cannot change directory to ", 2);
         ft_putstr(s[1], 2);
+        ft_putchar('\n', 2);
     }
-    ft_putchar('\n', 2);
 }
 
 int execut_cmd(char **s, char **env, int tmp, int i)
